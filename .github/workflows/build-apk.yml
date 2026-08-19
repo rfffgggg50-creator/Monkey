@@ -1,0 +1,81 @@
+name: Build Monkey Hop APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Arrange Android project
+        run: |
+          mkdir -p app/src/main/java/com/example/monkeyhopbot
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+
+          cp AndroidManifest.xml app/src/main/AndroidManifest.xml
+          cp MainActivity.kt app/src/main/java/com/example/monkeyhopbot/
+          cp BotAccessibilityService.kt app/src/main/java/com/example/monkeyhopbot/
+          cp BotController.kt app/src/main/java/com/example/monkeyhopbot/
+          cp GameDetector.kt app/src/main/java/com/example/monkeyhopbot/
+
+          cp strings.xml app/src/main/res/values/
+          cp styles.xml app/src/main/res/values/
+          cp accessibility_config.xml app/src/main/res/xml/
+
+          mkdir -p app
+          cp app-build.gradle app/build.gradle 2>/dev/null || cp build.gradle app/build.gradle
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
+
+          android {
+              namespace 'com.example.monkeyhopbot'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.example.monkeyhopbot'
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.15.0'
+              implementation 'androidx.appcompat:appcompat:1.7.0'
+              implementation 'androidx.activity:activity-ktx:1.10.1'
+          }
+          EOF
+
+          sed -i 's/Theme.Material3.DayNight.NoActionBar/Theme.AppCompat.DayNight.NoActionBar/' app/src/main/res/values/styles.xml
+
+      - name: Build APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: monkey-hop-bot-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
